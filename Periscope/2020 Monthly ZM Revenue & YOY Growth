@@ -1,0 +1,66 @@
+select SDG_CY.Month, SDG_CY."Sinclair Rev", ISNULL(SDG_CY."Sinclair Rev"/NULLIF(SDG_LY."Sinclair Rev",0) -1,2) as "Sinclair Growth",
+IHM_CY."IHM Rev",ISNULL(IHM_CY."IHM Rev"/NULLIF(IHM_LY."IHM Rev",0) -1,2) as "IHM Growth", 
+CBS_CY."CBS Rev",ISNULL(CBS_CY."CBS Rev"/NULLIF(CBS_LY."CBS Rev",0) -1,2) as "CBS Growth",
+Nexstar_CY."Nexstar Rev",ISNULL(Nexstar_CY."Nexstar Rev"/NULLIF(Nexstar_LY."Nexstar Rev",0) -1,2) as "Nexstar Growth",
+Univision_CY."Univision Rev",ISNULL(Univision_CY."Univision Rev"/NULLIF(Univision_LY."Univision Rev",0) -1,2) as "Univision Growth",
+Other_CY."Other Rev",ISNULL(Other_CY."Other Rev"/NULLIF(Other_LY."Other Rev",0) -1,2) as "Other Growth"
+from
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Sinclair Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization = 'Sinclair Digital Group' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) SDG_CY
+left join 
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Sinclair Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization = 'Sinclair Digital Group' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) SDG_LY
+on SDG_CY.Month = SDG_LY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "IHM Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization = 'iHeartMedia' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) IHM_CY
+on IHM_CY.Month = SDG_CY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "IHM Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization = 'iHeartMedia' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) IHM_LY
+on IHM_CY.Month = IHM_LY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "CBS Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization = 'CBS ONO' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) CBS_CY
+on CBS_CY.Month = SDG_CY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "CBS Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization = 'CBS ONO' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) CBS_LY
+on CBS_CY.Month = CBS_LY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Nexstar Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization = 'Nexstar Digital' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Nexstar_CY
+on Nexstar_CY.Month = SDG_CY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Nexstar Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization = 'Nexstar Digital' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Nexstar_LY
+on Nexstar_CY.Month = Nexstar_LY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Univision Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization = 'Univision' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Univision_CY
+on Univision_CY.Month = SDG_CY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Univision Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization = 'Univision' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Univision_LY
+on Univision_CY.Month = Univision_LY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Other Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,getdate()) and Organization != 'Gamut' and Organization != 'Test1' and Organization != 'Data' and Organization != 'Actualized Adjustment' and Organization !='ZypMedia' and Organization !='Sinclair Digital Group' and Organization != 'iHeartMedia' and Organization !='CBS ONO' and Organization !='Nexstar' and Organization !='Univision' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Other_CY
+on Other_CY.Month = SDG_CY.Month
+left join
+(select extract(month from MonthDate) as Month, sum("ZM Revenue") as "Other Rev"
+from [rowsfixed_most_recent_5k] where DATEPART(Year,MonthDate) = DATEPART(Year,dateadd(y, -1, getdate())) and Organization != 'Gamut' and Organization != 'Test1' and Organization != 'Data' and Organization != 'Actualized Adjustment' and Organization !='ZypMedia' and Organization !='Sinclair Digital Group' and Organization != 'iHeartMedia' and Organization !='CBS ONO' and Organization !='Nexstar' and Organization !='Univision' and "Campaign Name" not like ('%DO_NOT%') and "Campaign Name" not like ('%Do_Not%')
+group by 1 order by 1) Other_LY
+on Other_CY.Month = Other_LY.Month
+order by 1
