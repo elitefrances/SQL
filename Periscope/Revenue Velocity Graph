@@ -1,0 +1,91 @@
+*****************************************
+Revenue Velocity YEAR
+*****************************************
+
+with CTE as 
+(select alldate.Date,"2019 ZM daily revenue","2020 ZM daily revenue"
+ from
+ (select distinct to_char("IO Date",'MM-DD') as "Date"
+from [rowsfixed_most_recent_5k]
+where to_char("IO Date", 'YYYY')in ('2019','2020')
+and Organization != 'Test1' order by 1) as alldate
+ full join
+(select to_char("IO Date",'MM-DD') as LDate,sum("ZM Revenue") as "2019 ZM daily revenue"
+ from [rowsfixed_most_recent_5k]
+ where Organization != 'Test1' 
+ and to_char("IO Date", 'YYYY')= '2019'
+ and MonthDate like '2019-%'
+ and "Campaign Name" not like ('%DO_NOT%')
+and "Campaign Name" not like ('%Do_Not%')
+ and (Status not like '%Operative%')
+ and [Organization=Group]
+ group by 1) as year19 on year19.LDate = alldate.Date
+ full join
+(select to_char("IO Date",'MM-DD') as CDate,sum("ZM Revenue") as "2020 ZM daily revenue"
+ from [rowsfixed_most_recent_5k]
+ where Organization != 'Test1' 
+ and to_char("IO Date", 'YYYY')= '2020'
+ and MonthDate like '2020-%'
+ and "Campaign Name" not like ('%DO_NOT%')
+and "Campaign Name" not like ('%Do_Not%')
+ and (Status not like '%Operative%')
+ and [Organization=Group]
+ group by 1) as year20 on year20.CDate = alldate.Date)
+
+select "Date","2019 ZM daily revenue","2020 ZM daily revenue",
+(sum("2019 ZM daily revenue") over(order by "Date" rows between unbounded preceding and current row))+ 2182613 as "2019 YTD revenue",
+case when "Date"<= to_char(convert_timezone('PST', getdate()), 'MM-DD')
+     then sum("2020 ZM daily revenue") over(order by "Date" rows between unbounded preceding and current row) + 2288755
+     else null end as "2020 YTD revenue"
+from 
+CTE
+
+
+*****************************************
+Revenue Velocity MTD vs. LM
+*****************************************
+
+with CTE as 
+(select alldate.Date,"2020 LM daily revenue","2020 CM daily revenue"
+ from
+ (select distinct to_char("IO Date",'MM-DD') as "Date"
+from [rowsfixed_most_recent_5k]
+where to_char("IO Date", 'YYYY')in ('2019','2020')
+and Organization != 'Test1' order by 1) as alldate
+ full join
+(select to_char("IO Date",'MM-DD') as LDate,sum("ZM Revenue") as "2020 LM daily revenue"
+ from [rowsfixed_most_recent_5k]
+ where Organization != 'Test1' 
+ and to_char("IO Date", 'YYYY')= '2020'
+ and "Campaign Name" not like 'DO_NOT_USE%' and "Campaign Name" not like 'Do_Not_Use%' 
+ and MonthDate = [LastMonthDate]
+ and [Organization=Group] and (Status not like '%Operative%')
+ group by 1) as year19 on year19.LDate = alldate.Date
+ full join
+(select to_char("IO Date",'MM-DD') as CDate,sum("ZM Revenue") as "2020 CM daily revenue"
+ from [rowsfixed_most_recent_5k]
+ where Organization != 'Test1' 
+ and to_char("IO Date", 'YYYY')= '2020'
+ and "Campaign Name" not like 'DO_NOT_USE%' and "Campaign Name" not like 'Do_Not_Use%' and (Status not like '%Operative%')
+ and MonthDate = [ThisMonthDate]
+ and [Organization=Group]
+ group by 1) as year20 on year20.CDate = alldate.Date)
+
+select t."Day","2020 MTD Revenue","2020 LM Revenue"
+from
+(select substring("Date",4,5) as "Day",sum("2020 CM daily revenue") from CTE group by 1) t
+left join
+(select substring("Date",4,5) as "Day",
+    case when "Date"<= to_char(convert_timezone('PST', getdate()), 'MM-DD')
+               then sum("2020 CM daily revenue") over(order by "Date" rows between unbounded preceding and current row) + 410183
+               else null end as "2020 MTD Revenue"
+from CTE
+where substring("Date",1,2) = to_char(convert_timezone('PST', getdate()), 'MM')) a
+on t."Day" = a."Day"
+left join
+(select substring("Date",4,5) as "Day",
+ sum("2020 LM daily revenue") over(order by "Date" rows between unbounded preceding and current row) + 504249 as "2020 LM Revenue"
+from CTE
+where substring("Date",1,2) = to_char(convert_timezone('PST', dateadd(Month, -1, getdate())), 'MM')) b
+on t."Day" = b."Day"
+order by "Day"
