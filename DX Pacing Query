@@ -1,0 +1,111 @@
+-- ****************
+-- DX Pacing Sheet
+-- ****************
+
+
+-- Naming QA
+
+-- Check for irregular names
+
+#select campaign as `standardized_campaign`, a.Campaign as `raw_campaign`
+#from `Pacing DXRaw` a left join Naming_Campaigns b
+#on a.Campaign = b.raw_campaign
+#where b.raw_campaign is null
+#group by 1,2;
+
+
+-- Inserts all of these into Naming_campaigns, but make sure to fix irregulars after they get inserted
+
+insert into Naming_Campaigns
+select campaign as `standardized_campaign`, a.Campaign as `raw_campaign`
+from `Pacing DXRaw` a left join Naming_Campaigns b
+on a.Campaign = b.raw_campaign
+where b.raw_campaign is null
+group by 1,2;
+
+
+-- Table Creation
+
+drop table `Pacing Monthly Final`;
+create table `Pacing Monthly Final` as
+select   a.advertiser as Advertiser,
+		standardized_campaign as Campaign,
+		a.`Tactic` as `Tactic Name`,
+		a.Tactic,		
+		a.Date,
+		a.Device,
+		
+		CASE
+			WHEN a.Tactic = "Retargeting" THEN sum(a.Impressions)
+			ELSE 0
+		END as `RT_Imps`,
+
+	
+		CASE
+			WHEN a.Device = "SmartPhone" THEN sum(a.Impressions)
+			WHEN a.Device = "Tablet" THEN sum(a.Impressions)
+			ELSE 0
+		END as `Mobile_Imps`,
+		sum(a.`Impressions`) as Impressions,
+		sum(a.`Clicks`) as Clicks,
+		sum(a.`Complete`) as Completes,
+		sum(a.`Spend`) as Spend
+from `Pacing DXRaw` a
+join Naming_Campaigns b
+on a.Campaign = b.raw_campaign
+group by 1,2,3,4,5,6;
+
+
+
+-- DX Pacing Sheet
+
+SET time_zone = `America/Los_Angeles`;
+Drop table `Pacing Tracking`;
+Create table `Pacing Tracking` as
+select Final.Advertiser, Final.Campaign, Final.Market, Final.Organization, Final.Platform,Final.`Live Date`, Final.`End Date`, Final.`Analyst`, Final.`AM Team`, Final.`Tier`, Final.Tactic, Final.`AM Status`, Final.Impressions, Final.`Updated June Goal`, Final.`Monthly Flag`, 
+GREATEST(CAST(((Final.`Days Passed`)/Final.`Monthly Days`) * Final.`Updated June Goal` as signed),0) as Expected,
+CAST(CASE WHEN STR_TO_DATE(Final.`End Date`, '%m/%d/%Y') < CURDATE() THEN Final.Impressions/CAST(Final.`Updated June Goal` as signed)
+	ELSE Final.Impressions/CAST(((Final.`Days Passed`)/Final.`Monthly Days`) * Final.`Updated June Goal` as signed)
+	END as CHAR(4)) as Delta, 
+CAST(Final.Clicks/Final.Impressions*100 as DECIMAL(10,4)) as `June CTR`,
+CAST(Final.completes/Final.Impressions*100 as DECIMAL(10,1)) as `June VCR`, Final.`May CTR` as `May CTR`, Final.`Apr CTR` as `Apr CTR`,
+CAST((Yesterday.Clicks + TwoDays.Clicks + ThreeDays.Clicks) / (Yesterday.Impressions + TwoDays.Impressions + ThreeDays.Impressions) *100 as DECIMAL(10,3)) as `L3D CTR`,
+GREATEST(CAST((Final.`Updated June Goal`-Final.Impressions)/(Final.`Monthly Days` - (Final.`Days Passed`)) as signed),0) as DailyRemaining,
+CAST(Final.`Mobile %`*100 as DECIMAL(10, 1)) as `Mobile %`,
+CAST(Final.`RT %`*100 as DECIMAL(10,1)) as `RT %`,
+Yesterday.Impressions as Yesterday,
+TwoDays.Impressions As `Two Days Ago`,
+ThreeDays.Impressions As `Three Days Ago`,
+CAST(Final.CPM as Decimal(10,2)) as CPM,
+Final.Notes
+from 
+(Select a.Advertiser, a.Campaign, a.Market, a.Organization, a.Platform,a.`Live Date`, a.`End Date`, a.Analyst, a.`AM Team`, a.Tactic, a.`Tier`, a.`AM Status`, a.`Updated June Goal`, a.`Monthly Flag`, 
+(DAY(CURDATE()) - DAY(GREATEST(CAST(DATE_FORMAT(NOW() ,'%Y-%m-01') as DATE), 
+STR_TO_DATE(a.`Live Date`, '%m/%d/%Y')))) as `Days Passed`, (DAY(LEAST(LAST_DAY(CURDATE()), STR_TO_DATE(a.`End Date`, '%m/%d/%Y'))) - DAY(GREATEST(CAST(DATE_FORMAT(NOW() ,'%Y-%m-01') as DATE), STR_TO_DATE(a.`Live Date`, '%m/%d/%Y'))) + 1) as `Monthly Days`, 
+a.`May CTR`, a.`Apr CTR`, a.Notes, sum(b.Impressions) as Impressions, sum(b.Clicks) as Clicks, sum(b.completes) as completes,
+sum(b.Mobile_Imps)/sum(b.Impressions) as `Mobile %`,
+sum(b.RT_Imps)/sum(b.Impressions) as `RT %`,
+sum(b.`Spend`)*1000/sum(b.Impressions) as CPM
+From `Pacing Monthly Goals` a 
+left join `Pacing Monthly Final` b 
+on a.Campaign = b.Campaign
+where platform like "%DX%"
+group by 1,2,3,4,5,6,7,8,9,10) as Final
+
+left join
+(select Campaign, sum(Impressions) as Impressions, sum(Clicks) as Clicks FROM `Pacing Monthly Final`
+WHERE STR_TO_DATE(`Date`, '%m/%d/%Y') = subdate(current_date, 1)
+group by 1) as Yesterday
+on Final.Campaign = Yesterday.Campaign
+left join
+(select Campaign, sum(Impressions) as Impressions, sum(Clicks) as Clicks FROM `Pacing Monthly Final`
+WHERE STR_TO_DATE(`Date`, '%m/%d/%Y') = subdate(current_date, 2)
+group by 1) as TwoDays
+on Final.Campaign = TwoDays.Campaign
+left join
+(select Campaign, sum(Impressions) as Impressions, sum(Clicks) as Clicks FROM `Pacing Monthly Final`
+WHERE STR_TO_DATE(`Date`, '%m/%d/%Y') = subdate(current_date, 3)
+group by 1) as ThreeDays
+on Final.Campaign = ThreeDays.Campaign
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14;
+
