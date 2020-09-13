@@ -1,0 +1,34 @@
+select alldate.week,"Current Quarter Weekly Order", "Same Quarter Last Year Weekly Order"
+ from
+
+ (select distinct (to_char("IO Date",'mm') +'-week'+ to_char("IO Date",'w')) as "Week"
+  from [rowsfixed_most_recent_5k]
+  where (DATEPART(quarter, "IO Date") = DATEPART(quarter, GETDATE())
+         and DATEPART(year, "IO Date") = DATEPART(year, GETDATE()) -1)
+     or (DATEPART(quarter, "IO Date") = DATEPART(quarter, GETDATE())
+         and DATEPART(year, "IO Date") = DATEPART(year, GETDATE()))
+  order by 1) as alldate
+
+ full join
+
+(select (to_char("IO Date",'mm') +'-week'+ to_char("IO Date",'w')) as LDate,count(distinct ( "ZM Order Number" )) as "Same Quarter Last Year Weekly Order" 
+from [rowsfixed_most_recent_5k]
+where Organization != 'Gamut' and Organization != 'Test1' and Organization != 'Data' and Organization != 'Actualized Adjustment' and Organization !='ZypMedia'
+and DATEPART(quarter, "IO Date") = DATEPART(quarter, GETDATE())
+and DATEPART(year, "IO Date") = DATEPART(year, GETDATE()) -1
+and "Campaign Name" not like ('%DO_NOT%')
+and "Campaign Name" not like ('%Do_Not%')
+group by 1)as LM on LM.LDate = alldate.Week
+
+ full join
+
+(select (to_char("IO Date",'mm') +'-week'+ to_char("IO Date",'w')) as CDate,count(distinct ( "ZM Order Number" )) as "Current Quarter Weekly Order"
+from [rowsfixed_most_recent_5k]
+where Organization != 'Gamut' and Organization != 'Test1' and Organization != 'Data' and Organization != 'Actualized Adjustment' and Organization !='ZypMedia'
+and DATEPART(quarter, "IO Date") = DATEPART(quarter, GETDATE())
+and DATEPART(year, "IO Date") = DATEPART(year, GETDATE())
+and "Campaign Name" not like ('%DO_NOT%')
+and "Campaign Name" not like ('%Do_Not%') 
+group by 1) as CM on CM.CDate = alldate.Week
+
+order by alldate.Week
